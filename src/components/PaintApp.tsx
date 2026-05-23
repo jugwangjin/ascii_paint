@@ -2,10 +2,12 @@ import React, { useState, useRef, useEffect } from 'react';
 import { AppState } from '../types';
 import { Toolbar } from './Toolbar';
 import { Palette } from './Palette';
-import { CanvasArea } from './CanvasArea';
-import { renderAscii } from '../lib/paint';
+import { CanvasArea, CanvasAreaRef } from './CanvasArea';
+import { renderAscii, generateAsciiArt } from '../lib/paint';
 
 export function PaintApp() {
+  const canvasRef = useRef<CanvasAreaRef>(null);
+
   const [appState, setAppState] = useState<AppState>({
     currentTool: 'pencil',
     primaryColor: '#ffffff',
@@ -80,6 +82,50 @@ export function PaintApp() {
     }
   };
 
+  const handleExportText = () => {
+    const iCanvas = document.querySelector('canvas.hidden') as HTMLCanvasElement;
+    if (iCanvas) {
+      const ctx = iCanvas.getContext('2d');
+      if (ctx) {
+        const text = generateAsciiArt(ctx, appState.fontSize, appState.useCurvature, 'txt');
+        const blob = new Blob([text], { type: 'text/plain' });
+        const link = document.createElement('a');
+        link.download = 'ascii_paint.txt';
+        link.href = URL.createObjectURL(blob);
+        link.click();
+      }
+    }
+  };
+
+  const handleExportHtml = () => {
+    const iCanvas = document.querySelector('canvas.hidden') as HTMLCanvasElement;
+    if (iCanvas) {
+      const ctx = iCanvas.getContext('2d');
+      if (ctx) {
+        const html = generateAsciiArt(ctx, appState.fontSize, appState.useCurvature, 'html');
+        const blob = new Blob([html], { type: 'text/html' });
+        const link = document.createElement('a');
+        link.download = 'ascii_paint.html';
+        link.href = URL.createObjectURL(blob);
+        link.click();
+      }
+    }
+  };
+
+  const handleUndo = () => {
+    canvasRef.current?.undo();
+  };
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+        handleUndo();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
   // Close and minimize buttons are just visual in this demo, maybe maximize expands the wrapper.
   return (
     <div className="w-[600px] h-[1000px] max-w-full max-h-screen bg-[#c0c0c0] flex flex-col font-['Tahoma',_sans-serif] select-none overflow-hidden text-[#000] border border-gray-400 shadow-2xl">
@@ -108,10 +154,17 @@ export function PaintApp() {
               Open Image...
               <input type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
             </label>
-            <span className="cursor-pointer hover:bg-blue-800 hover:text-white px-2 py-1 whitespace-nowrap" onClick={handleSave}>Save ASCII...</span>
+            <span className="cursor-pointer hover:bg-blue-800 hover:text-white px-2 py-1 whitespace-nowrap" onClick={handleSave}>Save as Image (.png)</span>
+            <span className="cursor-pointer hover:bg-blue-800 hover:text-white px-2 py-1 whitespace-nowrap" onClick={handleExportText}>Export as Text (.txt)</span>
+            <span className="cursor-pointer hover:bg-blue-800 hover:text-white px-2 py-1 whitespace-nowrap" onClick={handleExportHtml}>Export as HTML (.html)</span>
           </div>
         </div>
-        <span className="cursor-pointer hover:bg-[#000080] hover:text-white px-1">Edit</span>
+        <div className="group relative">
+          <span className="cursor-pointer hover:bg-[#000080] hover:text-white px-1">Edit</span>
+          <div className="absolute left-0 top-full hidden group-hover:flex flex-col bg-[#c0c0c0] border-t-white border-l-white border-r-gray-800 border-b-gray-800 border p-1 z-50 text-black">
+            <span className="cursor-pointer hover:bg-blue-800 hover:text-white px-2 py-1 whitespace-nowrap text-left" onClick={handleUndo}>Undo (Ctrl+Z)</span>
+          </div>
+        </div>
         <span className="cursor-pointer hover:bg-[#000080] hover:text-white px-1">View</span>
         <span className="cursor-pointer hover:bg-[#000080] hover:text-white px-1">Image</span>
         <span className="cursor-pointer hover:bg-[#000080] hover:text-white px-1">Colors</span>
@@ -132,7 +185,7 @@ export function PaintApp() {
         {/* Canvas container */}
         <div className="flex-grow flex flex-col gap-1 overflow-hidden">
           <div className="flex-grow bg-[#404040] border-t-gray-800 border-l-gray-800 border-r-white border-b-white border relative overflow-hidden flex items-center justify-center shadow-inner">
-            <CanvasArea appState={appState} setAppState={setAppState} canvasSize={canvasSize} />
+            <CanvasArea ref={canvasRef} appState={appState} setAppState={setAppState} canvasSize={canvasSize} />
           </div>
           
           {/* Secondary toolbar merged into Palette area based on design */}
@@ -159,6 +212,7 @@ export function PaintApp() {
               </label>
             </div>
             <div className="ml-auto flex gap-2">
+              <button className="bg-[#c0c0c0] border-t-white border-l-white border-r-gray-800 border-b-gray-800 border px-3 py-1.5 text-[10px] font-bold shadow-sm active:border-t-gray-800 active:border-l-gray-800 active:border-r-white active:border-b-white hover:bg-gray-200 uppercase" onClick={handleExportText}>Export .TXT</button>
               <button className="bg-[#c0c0c0] border-t-white border-l-white border-r-gray-800 border-b-gray-800 border px-3 py-1.5 text-[10px] font-bold shadow-sm active:border-t-gray-800 active:border-l-gray-800 active:border-r-white active:border-b-white hover:bg-gray-200 uppercase" onClick={clearCanvas}>Clear Canvas</button>
             </div>
           </div>

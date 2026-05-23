@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef, useState, useEffect, forwardRef, useImperativeHandle } from 'react';
 import { AppState, Point } from '../types';
 import { floodFill, renderAscii } from '../lib/paint';
 
@@ -8,7 +8,12 @@ interface CanvasAreaProps {
   canvasSize: { width: number, height: number };
 }
 
-export function CanvasArea({ appState, setAppState, canvasSize }: CanvasAreaProps) {
+export interface CanvasAreaRef {
+  undo: () => void;
+  canUndo: boolean;
+}
+
+export const CanvasArea = forwardRef<CanvasAreaRef, CanvasAreaProps>(({ appState, setAppState, canvasSize }, ref) => {
   const internalCanvasRef = useRef<HTMLCanvasElement>(null);
   const displayCanvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -16,6 +21,42 @@ export function CanvasArea({ appState, setAppState, canvasSize }: CanvasAreaProp
   const [isDrawing, setIsDrawing] = useState(false);
   const [startPoint, setStartPoint] = useState<Point | null>(null);
   const [snapshot, setSnapshot] = useState<ImageData | null>(null);
+  const [history, setHistory] = useState<ImageData[]>([]);
+
+  const saveHistory = () => {
+    const canvas = internalCanvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    setHistory(prev => {
+      const newHistory = [...prev, imageData];
+      if (newHistory.length > 20) newHistory.shift();
+      return newHistory;
+    });
+  };
+
+  useImperativeHandle(ref, () => ({
+    undo: () => {
+      setHistory(prev => {
+        if (prev.length <= 1) return prev; // Keep at least the initial blank state
+        const newHistory = [...prev];
+        newHistory.pop(); // Remove current state
+        const restoredState = newHistory[newHistory.length - 1];
+        
+        const canvas = internalCanvasRef.current;
+        if (canvas) {
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.putImageData(restoredState, 0, 0);
+            updateDisplay();
+          }
+        }
+        return newHistory;
+      });
+    },
+    canUndo: history.length > 1
+  }));
 
   useEffect(() => {
     // initialize inner canvas with black background
@@ -24,6 +65,10 @@ export function CanvasArea({ appState, setAppState, canvasSize }: CanvasAreaProp
       if (ctx) {
         ctx.fillStyle = '#000';
         ctx.fillRect(0, 0, canvasSize.width, canvasSize.height);
+        
+        // Clear history and save initial blank state when canvas size changes
+        const initialData = ctx.getImageData(0, 0, canvasSize.width, canvasSize.height);
+        setHistory([initialData]);
       }
       updateDisplay();
     }
@@ -68,6 +113,7 @@ export function CanvasArea({ appState, setAppState, canvasSize }: CanvasAreaProp
     if (appState.currentTool === 'fill') {
       floodFill(ctx, Math.floor(pt.x), Math.floor(pt.y), color);
       updateDisplay();
+      saveHistory();
       return;
     }
 
@@ -146,6 +192,7 @@ export function CanvasArea({ appState, setAppState, canvasSize }: CanvasAreaProp
     setStartPoint(null);
     setSnapshot(null);
     updateDisplay();
+    saveHistory();
   };
   
   const handleContextMenu = (e: React.MouseEvent) => {
@@ -182,4 +229,4 @@ export function CanvasArea({ appState, setAppState, canvasSize }: CanvasAreaProp
       </div>
     </>
   );
-}
+});

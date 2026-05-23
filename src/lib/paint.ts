@@ -219,3 +219,126 @@ export function renderAscii(
     }
   }
 }
+
+export function generateAsciiArt(
+  sourceCtx: CanvasRenderingContext2D,
+  fontSize: number,
+  useCurvature: boolean,
+  format: 'txt' | 'html'
+): string {
+  const sCanvas = sourceCtx.canvas;
+  const width = sCanvas.width;
+  const height = sCanvas.height;
+
+  const imgData = sourceCtx.getImageData(0, 0, width, height);
+  const data = imgData.data;
+
+  const cellH = fontSize;
+  const cellW = Math.max(1, Math.floor(fontSize * 0.6));
+
+  let outText = '';
+  if (format === 'html') {
+    outText += `<html>\n<head>\n<style>\n` +
+      `  body { background-color: #000; color: #fff; font-family: "Courier New", monospace; font-size: ${fontSize}px; line-height: ${fontSize}px; white-space: pre; margin: 0; padding: 10px; }\n` +
+      `  span { display: inline-block; width: ${cellW}px; height: ${cellH}px; text-align: center; }\n` +
+      `</style>\n</head>\n<body>\n`;
+  }
+
+  for (let y = 0; y < height; y += cellH) {
+    let lineTxt = '';
+    let lineHtml = '';
+    
+    for (let x = 0; x < width; x += cellW) {
+      let rSum = 0, gSum = 0, bSum = 0, count = 0;
+      
+      const ey = Math.min(y + cellH, height);
+      const ex = Math.min(x + cellW, width);
+      for (let cy = y; cy < ey; cy++) {
+        for (let cx = x; cx < ex; cx++) {
+          const idx = (cy * width + cx) * 4;
+          rSum += data[idx];
+          gSum += data[idx + 1];
+          bSum += data[idx + 2];
+          count++;
+        }
+      }
+      
+      if (count === 0) continue;
+      const avgR = rSum / count;
+      const avgG = gSum / count;
+      const avgB = bSum / count;
+      
+      const pLuminance = (0.299 * avgR + 0.587 * avgG + 0.114 * avgB);
+      let char = ' ';
+      let cssColor = '#000000';
+
+      if (pLuminance >= 10) {
+        const { h, s, v } = rgbToHsv(avgR, avgG, avgB);
+        let charIdx = Math.floor((pLuminance / 255) * (ASCIICHARS.length - 1));
+        charIdx = Math.max(0, Math.min(charIdx, ASCIICHARS.length - 1));
+        char = ASCIICHARS[charIdx];
+
+        if (useCurvature && pLuminance > 20) {
+          const cx = Math.floor(x + cellW / 2);
+          const cy = Math.floor(y + cellH / 2);
+          if (cx > 0 && cx < width - 1 && cy > 0 && cy < height - 1) {
+            const idxTop = ((cy - 1) * width + cx) * 4;
+            const idxBottom = ((cy + 1) * width + cx) * 4;
+            const idxLeft = (cy * width + cx - 1) * 4;
+            const idxRight = (cy * width + cx + 1) * 4;
+            
+            const lumTop = (0.299 * data[idxTop] + 0.587 * data[idxTop+1] + 0.114 * data[idxTop+2]);
+            const lumBottom = (0.299 * data[idxBottom] + 0.587 * data[idxBottom+1] + 0.114 * data[idxBottom+2]);
+            const lumLeft = (0.299 * data[idxLeft] + 0.587 * data[idxLeft+1] + 0.114 * data[idxLeft+2]);
+            const lumRight = (0.299 * data[idxRight] + 0.587 * data[idxRight+1] + 0.114 * data[idxRight+2]);
+            
+            const gx = lumRight - lumLeft;
+            const gy = lumBottom - lumTop;
+            const gMag = Math.sqrt(gx*gx + gy*gy);
+            
+            if (gMag > 30) {
+              const angle = Math.atan2(gy, gx) * 180 / Math.PI;
+              const a = (angle + 360) % 180;
+              if (a < 22.5 || a > 157.5) char = '|';
+              else if (a >= 22.5 && a < 67.5) char = '\\';
+              else if (a >= 67.5 && a < 112.5) char = '-';
+              else if (a >= 112.5 && a <= 157.5) char = '/';
+            }
+          }
+        }
+
+        const TextRGB = hsvToRgb(h, Math.max(0.5, s), Math.max(0.7, v));
+        const colorR = s < 0.1 ? Math.round(pLuminance) : TextRGB.r;
+        const colorG = s < 0.1 ? Math.round(pLuminance) : TextRGB.g;
+        const colorB = s < 0.1 ? Math.round(pLuminance) : TextRGB.b;
+        cssColor = `rgb(${colorR},${colorG},${colorB})`;
+      }
+
+      if (format === 'txt') {
+        lineTxt += char;
+      } else {
+        if (char === ' ') {
+          lineHtml += `<span>&nbsp;</span>`;
+        } else {
+          let ec = char;
+          if (ec === '<') ec = '&lt;';
+          else if (ec === '>') ec = '&gt;';
+          else if (ec === '&') ec = '&amp;';
+          lineHtml += `<span style="color:${cssColor};">${ec}</span>`;
+        }
+      }
+    }
+    
+    if (format === 'txt') {
+      outText += lineTxt + '\n';
+    } else {
+      outText += `<div>${lineHtml}</div>\n`;
+    }
+  }
+
+  if (format === 'html') {
+    outText += `</body>\n</html>`;
+  }
+  
+  return outText;
+}
