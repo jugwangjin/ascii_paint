@@ -1,0 +1,38 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "MS Sans Serif", "Tahoma", sans-serif;
+  --font-mono: "Courier New", "Consolas", monospace;
+}
+
+@layer utilities {
+  .w95-window {
+    @apply bg-[#c0c0c0];
+    box-shadow: inset 1px 1px 0px 0px #ffffff, inset -1px -1px 0px 0px #000000, 1px 1px 0px 0px #000000;
+  }
+  .w95-titlebar {
+    @apply bg-gradient-to-r from-[#000080] to-[#1084d0] text-white font-bold p-1 flex items-center justify-between;
+  }
+  .w95-button {
+    @apply bg-[#c0c0c0] active:pt-[3px] active:pl-[3px] active:pb-[1px] active:pr-[1px] flex items-center justify-center;
+    box-shadow: inset 1px 1px 0px 0px #ffffff, inset -1px -1px 0px 0px #808080, inset 2px 2px 0px 0px #dfdfdf, inset -2px -2px 0px 0px #000000;
+  }
+  .w95-button:active, .w95-button.active {
+    box-shadow: inset 1px 1px 0px 0px #000000, inset -1px -1px 0px 0px #ffffff, inset 2px 2px 0px 0px #808080, inset -2px -2px 0px 0px #dfdfdf;
+  }
+  .w95-inset {
+    @apply bg-[#ffffff];
+    box-shadow: inset 1px 1px 0px 0px #808080, inset -1px -1px 0px 0px #ffffff, inset 2px 2px 0px 0px #000000, inset -2px -2px 0px 0px #dfdfdf;
+  }
+  .w95-outset {
+    box-shadow: inset 1px 1px 0px 0px #ffffff, inset -1px -1px 0px 0px #808080, inset 2px 2px 0px 0px #cfcfcf, inset -2px -2px 0px 0px #000000;
+  }
+  .pixelated {
+    image-rendering: pixelated;
+  }
+}
+
+body {
+  background-color: #008080; /* Classic Win95 desktop color */
+}
+
